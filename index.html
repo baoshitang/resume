@@ -1,6 +1,330 @@
+<!DOCTYPE html>
 <html>
-  <head></head>
-  <body>
-    hao 123
-  </body>
+<head>
+	<title></title>
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+	<style>
+		body {
+				margin: 0px;
+				overflow: hidden;
+			}
+
+	</style>
+</head>
+<body>
+
+	<script type="x-shader/x-vertex" id="vertexShader">
+		varying vec3 vWorldPosition;
+		void main() {
+			vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
+			vWorldPosition = worldPosition.xyz;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		}
+	</script>
+
+	<script type="x-shader/x-fragment" id="fragmentShader">
+		uniform vec3 topColor;
+		uniform vec3 bottomColor;
+		uniform float offset;
+		uniform float exponent;
+		varying vec3 vWorldPosition;
+		void main() {
+			float h = normalize( vWorldPosition + offset ).y;
+			gl_FragColor = vec4( mix( bottomColor, topColor, max( pow( max( h , 0.0), exponent ), 0.0 ) ), 1.0 );
+		}
+	</script>
+
+
+	<canvas></canvas>
+	<script type="text/javascript" src="js/three.js"></script>
+	<script type="text/javascript" src="js/control.js"></script>
+	<script type="text/javascript" src="js/mouse.js"></script>
+	<script type="text/javascript" src="js/qr.js"></script>
+	<script type="text/javascript" src="js/client.js"></script>
+	<script type="text/javascript" src="js/label.js"></script>
+	<script type="text/javascript">
+
+
+		~function(){
+
+
+			var canvas = document.querySelector("canvas");
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+
+			//判断客户端是否是手机
+			//如果不是手机就请求扫描二维码
+			if(/*jscd.mobile===false*/false){
+
+				var qr = new QRious({
+				  value: 'https://threejs.org/examples/#misc_controls_deviceorientation'
+				});
+
+
+				var img = new Image;
+				img.onload = function(){
+
+					var w = this.width;
+					var h = this.height;
+					var mh = window.innerHeight / 2
+					var mw = window.innerWidth  / 2;
+					var cx =  (mw - w / 2 );
+					var cy =  (mh -  h / 2 );
+
+					var ctx = canvas.getContext("2d");
+					ctx.drawImage(this, cx, cy, w , h);
+
+					ctx.font="16px serif";
+					var str = "您使用的是pc，请用手机扫描二维码";
+					var str2 = "可以在微信，手机qq跑跑看，没病毒的=_=,另外本vr简历全部采用最时髦的webgl"
+					var tgeo = ctx.measureText(str);
+					var tgeo2 = ctx.measureText(str2);
+
+					var twid = tgeo.width;
+					ctx.fillText(str,mw - twid / 2,mh + h/2 + 32);
+
+					
+					var twid2 = tgeo2.width;
+					ctx.fillText(str2,mw - twid2 / 2,mh + h/2 + 64);
+
+				}
+
+				img.src =  qr.toDataURL();
+
+				return ;
+
+			}
+
+			//模型部分属性
+			var container, camera, scene, renderer, controls
+			//选择部分属性
+			var raycaster;
+			//light
+			var hemiLight,dirLight
+			
+			//简历mesh
+			var resume = [];
+
+			scene = new THREE.Scene();
+			scene.background = new THREE.Color().setHSL( 0.6, 0, 1 );
+			scene.fog = new THREE.Fog( scene.background, 1, 5000 );
+
+			camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.001, 10000 );
+
+			//准星
+			var crosshair = new THREE.Mesh(
+					new THREE.RingGeometry( 0.02, 0.04, 32 ),
+					new THREE.MeshBasicMaterial( {
+						color: 0x000000,
+						opacity: .5,
+						transparent: true
+					} )
+				);
+			crosshair.position.z = - 2;
+			camera.add( crosshair );
+			scene.add(camera)
+
+
+
+			controls = new THREE.DeviceOrientationControls( camera );
+
+			raycaster = new THREE.Raycaster;
+			
+
+
+			//环境光
+			hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
+			hemiLight.color.setHSL( 0.6, 1, 0.6 );
+			hemiLight.groundColor.setHSL( 0.095, 1, 0.75 );
+			hemiLight.position.set( 0, 50, 0 );
+			scene.add( hemiLight );
+			//太阳光 
+			dirLight = new THREE.DirectionalLight( 0xffffff, 1 );
+			dirLight.color.setHSL( 0.1, 1, 0.95 );
+			dirLight.position.set( -1, 1.75, 1 );
+			dirLight.position.multiplyScalar( 30 );
+			scene.add( dirLight );
+			dirLight.castShadow = true;
+			dirLight.shadow.mapSize.width = 2048;
+			dirLight.shadow.mapSize.height = 2048;
+			var d = 50;
+			dirLight.shadow.camera.left = -d;
+			dirLight.shadow.camera.right = d;
+			dirLight.shadow.camera.top = d;
+			dirLight.shadow.camera.bottom = -d;
+			dirLight.shadow.camera.far = 3500;
+			dirLight.shadow.bias = -0.0001;
+			
+			//地板
+			var groundGeo = new THREE.PlaneBufferGeometry( 10000, 10000 );
+			var groundMat = new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0x050505 } );
+			groundMat.color.setHSL( 0.095, 1, 0.75 );
+			var ground = new THREE.Mesh( groundGeo, groundMat );
+			ground.rotation.x = -Math.PI/2;
+			ground.position.y = -33;
+			scene.add( ground );
+			//天空
+			var vertexShader = document.getElementById( 'vertexShader' ).textContent;
+			var fragmentShader = document.getElementById( 'fragmentShader' ).textContent;
+			var uniforms = {
+				topColor:    { value: new THREE.Color( 0x0077ff ) },
+				bottomColor: { value: new THREE.Color( 0xffffff ) },
+				offset:      { value: 33 },
+				exponent:    { value: 0.6 }
+			};
+			uniforms.topColor.value.copy( hemiLight.color );
+			scene.fog.color.copy( uniforms.bottomColor.value );
+			var skyGeo = new THREE.SphereGeometry( 4000, 32, 15 );
+			var skyMat = new THREE.ShaderMaterial( { vertexShader: vertexShader, fragmentShader: fragmentShader, uniforms: uniforms, side: THREE.BackSide } );
+			var sky = new THREE.Mesh( skyGeo, skyMat );
+			scene.add( sky );
+
+
+			
+			//主屏幕
+			var planeMaterial   = new THREE.MeshBasicMaterial({color: 0xffffff, opacity: 0.1});
+			var planeGeometry = new THREE.PlaneGeometry( 480, 320 );
+			var planeMesh= new THREE.Mesh( planeGeometry, planeMaterial );
+			planeMesh.position.z = -300;
+			planeMesh.position.y = 133;
+			scene.add(planeMesh);
+
+
+			//侧面1
+			// var sideMaterial1   = new THREE.MeshBasicMaterial({color: 0xffffff, opacity: 0.1});
+			// var sideGeometry1 = new THREE.PlaneGeometry( 320, 320 );
+			// var sideMesh1= new THREE.Mesh( sideGeometry1, sideMaterial1 );
+			// 	sideMesh1.position.x = -200;
+			// 	sideMesh1.position.y = 133;
+			// 	sideMesh1.position.z = 100;
+			// 	sideMesh1.rotation.y = Math.PI/2
+			// 	sideMaterial1.map = THREE.ImageUtils.loadTexture('img/inst.png')
+			// scene.add(sideMesh1);
+
+			//按钮
+			var inst = window.makeTextCanvas(" 个人简介 ");
+			var skill  = window.makeTextCanvas( " 技能介绍 ");
+			var exp  = window.makeTextCanvas( " 自我评价 ");
+
+			var material = new THREE.MeshBasicMaterial({color: 0xffffff,map:new THREE.Texture(inst)});
+				material.map.needsUpdate = true;
+			var instMesh = new THREE.Mesh( new THREE.BoxGeometry( 10, 10, 10 ), material );
+				instMesh.position.x =-50;
+				instMesh.position.z =-50;
+				instMesh.position.y = -15;
+				instMesh.TYPER = "inst"
+				scene.add(instMesh);
+				resume.push(instMesh)
+
+			var material1 = new THREE.MeshBasicMaterial({color: 0xffffff,map:new THREE.Texture(skill)});
+				material1.map.needsUpdate = true;
+			var skillMesh = new THREE.Mesh( new THREE.BoxGeometry( 10, 10, 10 ), material1 );
+				skillMesh.position.x =-30;
+				skillMesh.position.z =-50;
+				skillMesh.position.y = -15;
+				skillMesh.TYPER = "skill"
+				scene.add(skillMesh);
+				resume.push(skillMesh)
+
+			var material2 = new THREE.MeshBasicMaterial({color: 0xffffff,map:new THREE.Texture(exp)});
+				material2.map.needsUpdate = true;
+			var expMesh = new THREE.Mesh( new THREE.BoxGeometry( 10, 10, 10 ), material2 );
+				expMesh.position.x =-10;
+				expMesh.position.z =-50;
+				expMesh.position.y = -15;
+				expMesh.TYPER = "exp"
+				scene.add(expMesh);
+				resume.push(expMesh)
+
+
+
+			//渲染器
+			renderer = new THREE.WebGLRenderer({canvas:canvas});
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+
+			renderer.context.getShaderInfoLog = function () { return '' };
+
+			function resize(){
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+
+
+			//由于是8毫秒的特征
+			function locker(fn,times){
+
+
+
+				return {
+					release:function(){
+
+					}
+				}
+			}
+
+			function resumeGeometry(image , vec3){
+
+				var geometry = new THREE.BufferGeometry();
+
+				var indices = [];
+				var vertices = [];
+				var normals = [];
+
+
+			}
+
+			var selected;
+			var selectTexture = new THREE.Texture({color:0xff00000})
+
+			function cycle(){
+				window.requestAnimationFrame(cycle)
+					
+					raycaster.setFromCamera( {x:0,y:0}, camera );
+					var intersects = raycaster.intersectObjects( scene.children );
+
+					if ( intersects.length > 0 ) {
+						if ( selected != intersects[ 0 ].object && resume.some(function(i){return intersects[ 0 ].object===i}) ) {
+								selected && ( selected.material.color  = new THREE.Color(0xffffff) );
+								selected = intersects[ 0 ].object;
+								selected.material.color  = new THREE.Color(0xff0000);
+
+
+								switch (selected.TYPER) {
+									case "inst":
+										planeMaterial.map = THREE.ImageUtils.loadTexture('img/inst.png')
+										break;
+									case "skill":
+										planeMaterial.map = THREE.ImageUtils.loadTexture('img/skill.png')
+										break;
+									case "exp":
+										planeMaterial.map = THREE.ImageUtils.loadTexture('img/exp.png')
+								}
+
+								planeMaterial.needsUpdate = true;
+
+						}
+					} 
+
+
+				controls.update();
+				renderer.render( scene, camera );
+			}
+			resize();
+			cycle();
+
+			window.addEventListener("resize",resize , false);
+
+			
+
+
+
+		}();
+
+
+			
+	</script>
+</body>
 </html>
