@@ -39,10 +39,12 @@
 	<canvas></canvas>
 	<script type="text/javascript" src="js/three.js"></script>
 	<script type="text/javascript" src="js/control.js"></script>
-	<script type="text/javascript" src="js/mouse.js"></script>
+	<script type="text/javascript" src="js/voice.js"></script>
 	<script type="text/javascript" src="js/qr.js"></script>
 	<script type="text/javascript" src="js/client.js"></script>
 	<script type="text/javascript" src="js/label.js"></script>
+
+
 	<script type="text/javascript">
 
 
@@ -55,10 +57,10 @@
 
 			//判断客户端是否是手机
 			//如果不是手机就请求扫描二维码
-			if(jscd.mobile===false){
+			if(/*jscd.mobile===false*/false){
 
 				var qr = new QRious({
-				  value: 'https://baoshitang.github.io/resume/'
+				  value: 'http://10.0.0.5:8002/3dresume/index.html'
 				});
 
 
@@ -190,17 +192,30 @@
 			planeMesh.position.y = 133;
 			scene.add(planeMesh);
 
+			//侧面音频
+			var sideMaterial2   = new THREE.MeshBasicMaterial({color: 0xffffff, opacity: 0.1});
+			var sideGeometry2 = new THREE.PlaneGeometry( 160,120 );
+			var sideMesh2= new THREE.Mesh(sideGeometry2 , sideMaterial2 );
+				sideMesh2.position.x = -150;
+				sideMesh2.position.y = 33;
+				sideMesh2.position.z = 50;
+				sideMesh2.rotation.y = Math.PI/2
+				sideMesh2.visible=false;
+			scene.add(sideMesh2);
 
-			//侧面1
-			// var sideMaterial1   = new THREE.MeshBasicMaterial({color: 0xffffff, opacity: 0.1});
-			// var sideGeometry1 = new THREE.PlaneGeometry( 320, 320 );
-			// var sideMesh1= new THREE.Mesh( sideGeometry1, sideMaterial1 );
-			// 	sideMesh1.position.x = -200;
-			// 	sideMesh1.position.y = 133;
-			// 	sideMesh1.position.z = 100;
-			// 	sideMesh1.rotation.y = Math.PI/2
-			// 	sideMaterial1.map = THREE.ImageUtils.loadTexture('img/inst.png')
-			// scene.add(sideMesh1);
+
+			//侧面音频
+			var sideMaterial1   = new THREE.MeshBasicMaterial({color: 0xffffff, opacity: 0.1});
+			var sideGeometry1 = new THREE.PlaneGeometry( 32, 32 );
+			var sideMesh1= new THREE.Mesh( sideGeometry1, sideMaterial1 );
+				sideMesh1.position.x = -130;
+				sideMesh1.position.y = 0;
+				sideMesh1.position.z = 50;
+				sideMesh1.rotation.y = Math.PI/2
+				sideMaterial1.map = THREE.ImageUtils.loadTexture('img/speaker.png')
+				sideMesh1.TYPER = "sound"
+			scene.add(sideMesh1);
+			resume.push(sideMesh1)
 
 			//按钮
 			var inst = window.makeTextCanvas(" 个人简介 ");
@@ -253,18 +268,6 @@
 			}
 
 
-			//由于是8毫秒的特征
-			function locker(fn,times){
-
-
-
-				return {
-					release:function(){
-
-					}
-				}
-			}
-
 			function resumeGeometry(image , vec3){
 
 				var geometry = new THREE.BufferGeometry();
@@ -287,27 +290,60 @@
 
 					if ( intersects.length > 0 ) {
 						if ( selected != intersects[ 0 ].object && resume.some(function(i){return intersects[ 0 ].object===i}) ) {
+
+
 								selected && ( selected.material.color  = new THREE.Color(0xffffff) );
 								selected = intersects[ 0 ].object;
-								selected.material.color  = new THREE.Color(0xff0000);
 
 
-								switch (selected.TYPER) {
-									case "inst":
-										planeMaterial.map = THREE.ImageUtils.loadTexture('img/inst.png')
-										break;
-									case "skill":
-										planeMaterial.map = THREE.ImageUtils.loadTexture('img/skill.png')
-										break;
-									case "exp":
-										planeMaterial.map = THREE.ImageUtils.loadTexture('img/exp.png')
-								}
+								if(selected.TYPER==="sound"){
 
-								planeMaterial.needsUpdate = true;
+									if(voice.status<1){
+
+										voice.readBuffer("img/js.mp3",function(buff){
+											voice.decode(buff)
+										})
+
+										
+										sideMesh2.visible = true;
+										
+										voice.voiceEnd = function(){
+											sideMesh2.visible = false;
+										}
+
+									}
+
+								}else{
+
+									selected.material.color  = new THREE.Color(0xff0000);
+
+
+									switch (selected.TYPER) {
+										case "inst":
+											planeMaterial.map = THREE.ImageUtils.loadTexture('img/inst.png')
+											break;
+										case "skill":
+											planeMaterial.map = THREE.ImageUtils.loadTexture('img/skill.png')
+											break;
+										case "exp":
+											planeMaterial.map = THREE.ImageUtils.loadTexture('img/exp.png')
+											break;
+									}
+
+
+
+									planeMaterial.needsUpdate = true;
+							}
 
 						}
 					} 
 
+
+					
+
+					sideMaterial2.map = new THREE.Texture(voice.canvas)
+					sideMaterial2.map.needsUpdate = true;
+				
 
 				controls.update();
 				renderer.render( scene, camera );
@@ -319,6 +355,7 @@
 			window.addEventListener("orientationchange", resize, false);
 			
 
+			
 
 
 		}();
